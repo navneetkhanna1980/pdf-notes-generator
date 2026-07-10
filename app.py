@@ -194,76 +194,78 @@ class NotesGenerator:
 
     def __init__(self, api_key):
         genai.configure(api_key=api_key)
+        
+        # Try models one by one until one works
         self.model = None
-        self.model_name = ""
-
-        # ✅ Updated model list - Latest working models
+        
         models_to_try = [
             'gemini-2.0-flash-exp',
             'gemini-1.5-flash-latest',
             'gemini-1.5-pro-latest',
-            'gemini-1.5-flash',
-            'gemini-1.5-pro',
             'gemini-pro',
         ]
-
+        
         for model_name in models_to_try:
             try:
-                test_model = genai.GenerativeModel(model_name)
-                test_response = test_model.generate_content("Say hello")
-                if test_response:
-                    self.model = test_model
-                    self.model_name = model_name
-                    break
-            except Exception:
+                self.model = genai.GenerativeModel(model_name)
+                # Test the model
+                test = self.model.generate_content("Say OK")
+                st.sidebar.success(f"✅ Model: {model_name}")
+                break
+            except Exception as e:
                 continue
-
+        
         if self.model is None:
-            st.error("❌ No Gemini model found. Please check your API key!")
-
-    def generate_notes_for_chapter(self, chapter_title,
-                                    chapter_content, notes_style, language):
+            st.error("❌ No working Gemini model found. Check API Key!")
+    
+    def generate_notes_for_chapter(self, chapter_title, chapter_content, notes_style, language):
+        """Generate structured notes for a chapter"""
+        
         style_prompts = {
             "Detailed": "comprehensive and detailed",
             "Concise": "brief and concise (bullet points only)",
             "Mind Map Style": "mind map style with main topics and sub-topics",
             "Q&A Format": "question and answer format",
-            "Exam Ready": "exam-focused with important definitions and key points"
+            "Exam Ready": "exam-focused with important definitions, formulas, and key points highlighted"
         }
+        
         style_desc = style_prompts.get(notes_style, "comprehensive")
-
+        
         prompt = f"""
-        You are an expert educator and note-maker.
+        You are an expert educator and note-maker. 
         Create {style_desc} study notes from the following content.
-
+        
         Chapter/Section: {chapter_title}
-
+        
         Content:
         {chapter_content[:8000]}
-
+        
         Instructions:
         1. Extract ONLY the most important information
         2. Remove all unnecessary filler content
-        3. Organize information clearly
+        3. Organize information in a clear, structured format
         4. Use bullet points for key facts
-        5. Mark definitions with "📌 Definition:"
-        6. Mark formulas with "📐 Formula:"
+        5. Highlight definitions with "📌 Definition:"
+        6. Mark important formulas with "📐 Formula:"
         7. Mark key concepts with "🔑 Key Concept:"
         8. Mark examples with "💡 Example:"
         9. Add "⚠️ Important:" for critical points
-        10. Create "📝 Quick Summary" at the end
-        11. Write in {language} language
-
-        Format beautifully with emojis and clear structure.
+        10. Create a "📝 Quick Summary" at the end
+        11. Write notes in {language} language
+        
+        Format the notes beautifully with proper sections and emojis.
+        Make sure notes are student-friendly and easy to understand.
         """
-
+        
         try:
             response = self.model.generate_content(prompt)
             return response.text
         except Exception as e:
-            return f"Error: {str(e)}"
-
+            return f"Error generating notes: {str(e)}"
+    
     def generate_notes_no_chapters(self, full_text, notes_style, language):
+        """Generate notes when no chapters detected"""
+        
         style_prompts = {
             "Detailed": "comprehensive and detailed",
             "Concise": "brief and concise",
@@ -271,72 +273,84 @@ class NotesGenerator:
             "Q&A Format": "question and answer format",
             "Exam Ready": "exam-focused"
         }
+        
         style_desc = style_prompts.get(notes_style, "comprehensive")
-
+        
         prompt = f"""
         You are an expert educator and note-maker.
-        Create {style_desc} study notes from this document.
-
+        Create {style_desc} study notes from the following document content.
+        
         Content:
         {full_text[:10000]}
-
+        
         Instructions:
-        1. Identify and organize main topics
-        2. Extract ONLY important information
-        3. Create proper sections
-        4. Use bullet points
-        5. Mark definitions with "📌 Definition:"
-        6. Mark formulas with "📐 Formula:"
-        7. Mark concepts with "🔑 Key Concept:"
+        1. Identify and organize main topics automatically
+        2. Extract ONLY the most important information
+        3. Create proper sections based on content flow
+        4. Use bullet points for key facts
+        5. Highlight definitions with "📌 Definition:"
+        6. Mark important formulas with "📐 Formula:"
+        7. Mark key concepts with "🔑 Key Concept:"
         8. Mark examples with "💡 Example:"
         9. Add "⚠️ Important:" for critical points
-        10. Create "📝 Quick Summary" at end
-        11. Write in {language} language
-
+        10. Create a "📝 Quick Summary" at the end
+        11. Write notes in {language} language
+        12. Add topic headers for each main topic
+        
         Format beautifully with proper structure.
+        Make notes student-friendly and comprehensive.
         """
-
+        
         try:
             response = self.model.generate_content(prompt)
             return response.text
         except Exception as e:
-            return f"Error: {str(e)}"
-
+            return f"Error generating notes: {str(e)}"
+    
     def generate_key_points(self, full_text, language):
+        """Generate overall key points"""
+        
         prompt = f"""
-        From this content extract:
+        From the following content, extract:
         1. Top 10 most important key points
         2. 5 most important definitions
-        3. Critical formulas or rules
-        4. Common exam questions
-
+        3. Critical formulas or rules (if any)
+        4. Common exam questions that might be asked
+        
         Content: {full_text[:5000]}
+        
         Language: {language}
-
-        Use clear sections, bullet points and emojis.
+        
+        Format with clear sections and bullet points.
+        Use emojis to make it visually appealing.
         """
+        
         try:
             response = self.model.generate_content(prompt)
             return response.text
         except Exception as e:
             return f"Error: {str(e)}"
-
+    
     def generate_flashcards(self, full_text, language):
+        """Generate flashcards for quick revision"""
+        
         prompt = f"""
-        Create 15 flashcards for quick revision.
-
-        Format:
+        Create 15 flashcards from this content for quick revision.
+        
+        Format each flashcard as:
+        
         🃏 CARD [NUMBER]
         Q: [Question]
         A: [Answer]
         ---
-
+        
         Content: {full_text[:5000]}
         Language: {language}
-
-        Make diverse questions - definitions, concepts, applications.
+        
+        Make questions diverse - definitions, concepts, applications.
         Keep answers concise but complete.
         """
+        
         try:
             response = self.model.generate_content(prompt)
             return response.text
